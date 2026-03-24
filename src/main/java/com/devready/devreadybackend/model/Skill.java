@@ -84,4 +84,17 @@ public class Skill {
     public Double getCustomDecayRate() { return customDecayRate; }
     public void setCustomDecayRate(Double customDecayRate) { this.customDecayRate = customDecayRate; }
 
+    // the tags applied to this skill e.g. "work", "hobbies"
+// many skills can have many tags — this is a many-to-many relationship
+    @ManyToMany
+    @JoinTable(
+            name = "skill_tag_mapping",
+            joinColumns = @JoinColumn(name = "skill_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private java.util.List<SkillTag> tags = new java.util.ArrayList<>();
+
+    public java.util.List<SkillTag> getTags() { return tags; }
+    public void setTags(java.util.List<SkillTag> tags) { this.tags = tags; }
+
 }
