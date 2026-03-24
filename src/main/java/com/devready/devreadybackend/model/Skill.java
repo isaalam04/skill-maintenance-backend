@@ -1,25 +1,26 @@
 package com.devready.devreadybackend.model;
 
-import jakarta.persistence.*;  // imports everything needed to map this class to a database table
-import java.time.LocalDate;    // used to store dates without time (e.g. 2026-03-01)
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 
-// @Entity tells spring boot this class maps to a database table
+// represents a single skill tracked by a user
+// each skill has a health score that decays over time using H(t) = 100 * e^(-λt)
 @Entity
-// @Table sets the actual table name in postgresql
 @Table(name = "skills")
 public class Skill {
 
-    // @Id marks this as the primary key (unique identifier for each row)
     @Id
-    // @GeneratedValue means the database auto-increments the id (1, 2, 3...)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // the name of the skill e.g. "spanish" or "java"
+    // @NotBlank ensures the skill name cannot be empty or just whitespace
+    @NotBlank(message = "skill name cannot be blank")
     private String name;
 
-    // @Enumerated(STRING) stores the enum as text in the db e.g. "LANGUAGE"
-    // instead of a number, which makes the database readable
+    // @NotNull ensures a skill type must always be provided
+    @NotNull(message = "skill type is required")
     @Enumerated(EnumType.STRING)
     private SkillType skillType;
 
@@ -34,7 +35,6 @@ public class Skill {
 
     // the current health of the skill from 0.0 to 100.0
     // calculated using H(t) = 100 * e^(-λt)
-    // stored here so we don't recalculate it every time
     private double healthScore;
 
     // true if the skill has reached 0 health and moved to the skill cemetery
@@ -43,9 +43,11 @@ public class Skill {
     // the user's level e.g. "beginner", "intermediate", "advanced", "mastery"
     private String proficiencyLevel;
 
-    // --- getters and setters ---
-    // these allow other classes to read and write each field
-    // spring and jpa require these to function correctly
+    // many skills can belong to one user
+    // @JoinColumn sets the foreign key column in the skills table
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -70,4 +72,7 @@ public class Skill {
 
     public String getProficiencyLevel() { return proficiencyLevel; }
     public void setProficiencyLevel(String proficiencyLevel) { this.proficiencyLevel = proficiencyLevel; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 }
