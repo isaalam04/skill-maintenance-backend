@@ -75,4 +75,13 @@ public class Skill {
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+
+    // optional custom decay rate set by the user
+    // if null, the system uses the default rate for the skill type
+    // allows users to override λ for individual skills
+    private Double customDecayRate;
+
+    public Double getCustomDecayRate() { return customDecayRate; }
+    public void setCustomDecayRate(Double customDecayRate) { this.customDecayRate = customDecayRate; }
+
 }

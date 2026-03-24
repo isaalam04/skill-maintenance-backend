@@ -1,10 +1,15 @@
 package com.devready.devreadybackend.service;
 
+import com.devready.devreadybackend.dto.DashboardSummaryResponse;
+import com.devready.devreadybackend.dto.SkillHistoryResponse;
 import com.devready.devreadybackend.model.*;
 import com.devready.devreadybackend.repository.*;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class SkillService {
@@ -15,19 +20,22 @@ public class SkillService {
     private final UserRepository userRepository;
     private final ReminderRepository reminderRepository;
     private final CemeteryRepository cemeteryRepository;
+    private final SkillHealthSnapshotRepository snapshotRepository;
 
     public SkillService(SkillRepository skillRepository,
                         PracticeLogRepository practiceLogRepository,
                         DecayService decayService,
                         UserRepository userRepository,
                         ReminderRepository reminderRepository,
-                        CemeteryRepository cemeteryRepository) {
+                        CemeteryRepository cemeteryRepository,
+                        SkillHealthSnapshotRepository snapshotRepository) {
         this.skillRepository = skillRepository;
         this.practiceLogRepository = practiceLogRepository;
         this.decayService = decayService;
         this.userRepository = userRepository;
         this.reminderRepository = reminderRepository;
         this.cemeteryRepository = cemeteryRepository;
+        this.snapshotRepository = snapshotRepository;
     }
 
     // helper to get user by email — throws if not found
@@ -100,9 +108,22 @@ public class SkillService {
         return skillRepository.save(skill);
     }
 
+    // sets a custom decay rate for a specific skill
+    // allows users to override the default λ for individual skills
+    public Skill setCustomDecayRate(Long skillId, String email, double customRate) {
+        User user = getUser(email);
+        Skill skill = skillRepository.findByIdAndUser(skillId, user)
+                .orElseThrow(() -> new RuntimeException("skill not found or access denied"));
+
+        if (customRate < 0) throw new RuntimeException("decay rate cannot be negative");
+        skill.setCustomDecayRate(customRate);
+        return skillRepository.save(skill);
+    }
+
     // refreshes health scores for all active skills belonging to this user
     // creates reminders for skills entering the forgetting zone
     // moves dead skills to the cemetery
+    // saves a daily health snapshot for history tracking
     public void refreshAllHealthScores(String email) {
         User user = getUser(email);
         List<Skill> active = skillRepository.findByUserAndInCemeteryFalse(user);
@@ -119,10 +140,20 @@ public class SkillService {
             }
 
             skillRepository.save(skill);
+
+            // save a daily health snapshot for history tracking
+            // this is what powers the health-over-time chart on the frontend
+            SkillHealthSnapshot snapshot = new SkillHealthSnapshot();
+            snapshot.setSkill(skill);
+            snapshot.setUser(user);
+            snapshot.setSnapshotDate(LocalDate.now());
+            snapshot.setHealthScore(health);
+            snapshotRepository.save(snapshot);
         }
     }
 
     // revives a skill from the cemetery
+    // starts at 25% health to reflect that relearning is needed
     public Skill reviveSkill(Long cemeteryEntryId, String email) {
         User user = getUser(email);
         CemeteryEntry entry = cemeteryRepository.findById(cemeteryEntryId)
@@ -172,6 +203,66 @@ public class SkillService {
 
         reminder.setDismissed(true);
         reminderRepository.save(reminder);
+    }
+
+    // returns a dashboard summary for the logged-in user
+    // total skills, forgetting zone count, cemetery count, average health, reminders, streak
+    public DashboardSummaryResponse getDashboardSummary(String email) {
+        User user = getUser(email);
+        List<Skill> active = skillRepository.findByUserAndInCemeteryFalse(user);
+        List<CemeteryEntry> cemetery = cemeteryRepository.findByUser(user);
+        List<Reminder> reminders = reminderRepository.findByUserAndDismissedFalse(user);
+
+        int totalSkills = active.size();
+        int inForgettingZone = (int) active.stream()
+                .filter(s -> decayService.isInForgettingZone(s.getHealthScore()))
+                .count();
+        int inCemetery = cemetery.size();
+        double averageHealth = active.isEmpty() ? 0.0 :
+                active.stream().mapToDouble(Skill::getHealthScore).average().orElse(0.0);
+        averageHealth = Math.round(averageHealth * 10.0) / 10.0;
+        int activeReminders = reminders.size();
+        int streak = calculateStreak(email);
+
+        return new DashboardSummaryResponse(
+                totalSkills, inForgettingZone, inCemetery,
+                averageHealth, activeReminders, streak
+        );
+    }
+
+    // returns the daily health history for a specific skill
+    // used to draw the health-over-time chart on the frontend
+    public List<SkillHistoryResponse> getSkillHistory(Long skillId, String email) {
+        User user = getUser(email);
+        Skill skill = skillRepository.findByIdAndUser(skillId, user)
+                .orElseThrow(() -> new RuntimeException("skill not found or access denied"));
+
+        return snapshotRepository.findBySkillOrderBySnapshotDateAsc(skill)
+                .stream()
+                .map(s -> new SkillHistoryResponse(s.getSnapshotDate(), s.getHealthScore()))
+                .collect(Collectors.toList());
+    }
+
+    // calculates how many consecutive days the user has practiced any skill
+    private int calculateStreak(String email) {
+        User user = getUser(email);
+        List<Skill> skills = skillRepository.findByUserAndInCemeteryFalse(user);
+
+        // collect all unique practice dates across all skills
+        Set<LocalDate> practiceDates = new HashSet<>();
+        for (Skill skill : skills) {
+            practiceLogRepository.findBySkillOrderByPracticeDateDesc(skill)
+                    .forEach(log -> practiceDates.add(log.getPracticeDate()));
+        }
+
+        // count backwards from today until we find a day with no practice
+        int streak = 0;
+        LocalDate date = LocalDate.now();
+        while (practiceDates.contains(date)) {
+            streak++;
+            date = date.minusDays(1);
+        }
+        return streak;
     }
 
     // creates a cemetery entry when a skill reaches zero health
