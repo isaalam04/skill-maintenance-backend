@@ -24,7 +24,6 @@ public class AuthController {
     // POST /api/auth/register
     // expects: { email, password, displayName }
     // returns: jwt token + user info
-    // @Valid triggers the validation annotations on RegisterRequest
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
@@ -39,13 +38,11 @@ public class AuthController {
     }
 
     // POST /api/auth/reset-request?email=user@example.com
-    // step 1 of password reset — generates a reset token
-    // in production this would send an email with the token
-    // for now it returns the token directly so it can be tested
+    // step 1 of password reset — generates a reset token and emails it via sendgrid
     @PostMapping("/reset-request")
     public ResponseEntity<String> requestReset(@RequestParam String email) {
-        String token = authService.requestPasswordReset(email);
-        return ResponseEntity.ok("reset token: " + token);
+        authService.requestPasswordReset(email);
+        return ResponseEntity.ok("reset token sent to " + email);
     }
 
     // POST /api/auth/reset-password?email=x&token=x&newPassword=x

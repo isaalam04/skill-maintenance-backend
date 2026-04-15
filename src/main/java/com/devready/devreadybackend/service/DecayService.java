@@ -35,6 +35,9 @@ public class DecayService {
     }
 
     // H(t) = 100 * e^(-λt)
+    // we use exponential decay because ebbinghaus (1885) showed memory loss
+    // follows this curve, skills drop fast when neglected and then more slowly
+    // this means a small refresh early prevents a larger loss later
     public double calculateHealth(Skill skill) {
         if (skill.getLastPracticed() == null) return 0.0;
         long t = ChronoUnit.DAYS.between(skill.getLastPracticed(), LocalDate.now());

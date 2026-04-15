@@ -303,6 +303,9 @@ public class SkillService {
     }
 
     // consistency = proportion of last 7 days where practice occurred
+    // we look at the last 7 days only — older practice matters less
+    // a user who practiced 5 out of 7 days gets 0.71 consistency
+    // this directly reduces their decay rate, rewarding regular practice
     private double calculateConsistency(List<PracticeLog> history) {
         if (history.isEmpty()) return 0.0;
         LocalDate cutoff = LocalDate.now().minusDays(7);

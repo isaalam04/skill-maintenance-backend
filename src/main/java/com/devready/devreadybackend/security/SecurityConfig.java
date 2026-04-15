@@ -39,6 +39,9 @@ public class SecurityConfig {
 
                 // use stateless sessions — no server-side session storage
                 // every single request must include the jwt token
+                // stateless means the server never stores session data
+                // every request must prove who it is via the jwt token
+                // this makes the api scalable — any server can handle any request
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )

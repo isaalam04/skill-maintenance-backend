@@ -1,9 +1,12 @@
 package com.devready.devreadybackend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 // represents a single skill tracked by a user
 // each skill has a health score that decays over time using H(t) = 100 * e^(-λt)
@@ -43,11 +46,43 @@ public class Skill {
     // the user's level e.g. "beginner", "intermediate", "advanced", "mastery"
     private String proficiencyLevel;
 
+    // optional custom decay rate set by the user
+    // if null, the system uses the default rate for the skill type
+    private Double customDecayRate;
+
     // many skills can belong to one user
-    // @JoinColumn sets the foreign key column in the skills table
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @JsonIgnore
     private User user;
+
+    // one skill can have many practice logs
+    // cascade = ALL ensures logs are deleted when the skill is deleted
+    // orphanRemoval = true cleans up any orphaned logs
+    @OneToMany(mappedBy = "skill", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<PracticeLog> practiceLogs = new ArrayList<>();
+
+    // one skill can have many reminders
+    // cascade = ALL ensures reminders are deleted when the skill is deleted
+    @OneToMany(mappedBy = "skill", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Reminder> reminders = new ArrayList<>();
+
+    // one skill can have many health snapshots
+    // cascade = ALL ensures snapshots are deleted when the skill is deleted
+    @OneToMany(mappedBy = "skill", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<SkillHealthSnapshot> snapshots = new ArrayList<>();
+
+    // many skills can have many tags — many-to-many relationship
+    @ManyToMany
+    @JoinTable(
+            name = "skill_tag_mapping",
+            joinColumns = @JoinColumn(name = "skill_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private List<SkillTag> tags = new ArrayList<>();
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -73,28 +108,21 @@ public class Skill {
     public String getProficiencyLevel() { return proficiencyLevel; }
     public void setProficiencyLevel(String proficiencyLevel) { this.proficiencyLevel = proficiencyLevel; }
 
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-
-    // optional custom decay rate set by the user
-    // if null, the system uses the default rate for the skill type
-    // allows users to override λ for individual skills
-    private Double customDecayRate;
-
     public Double getCustomDecayRate() { return customDecayRate; }
     public void setCustomDecayRate(Double customDecayRate) { this.customDecayRate = customDecayRate; }
 
-    // the tags applied to this skill e.g. "work", "hobbies"
-// many skills can have many tags — this is a many-to-many relationship
-    @ManyToMany
-    @JoinTable(
-            name = "skill_tag_mapping",
-            joinColumns = @JoinColumn(name = "skill_id"),
-            inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
-    private java.util.List<SkillTag> tags = new java.util.ArrayList<>();
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public java.util.List<SkillTag> getTags() { return tags; }
-    public void setTags(java.util.List<SkillTag> tags) { this.tags = tags; }
+    public List<PracticeLog> getPracticeLogs() { return practiceLogs; }
+    public void setPracticeLogs(List<PracticeLog> practiceLogs) { this.practiceLogs = practiceLogs; }
 
+    public List<Reminder> getReminders() { return reminders; }
+    public void setReminders(List<Reminder> reminders) { this.reminders = reminders; }
+
+    public List<SkillHealthSnapshot> getSnapshots() { return snapshots; }
+    public void setSnapshots(List<SkillHealthSnapshot> snapshots) { this.snapshots = snapshots; }
+
+    public List<SkillTag> getTags() { return tags; }
+    public void setTags(List<SkillTag> tags) { this.tags = tags; }
 }

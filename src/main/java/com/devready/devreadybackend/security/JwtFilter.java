@@ -26,6 +26,9 @@ public class JwtFilter extends OncePerRequestFilter {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
     }
+    // this filter runs before every request reaches a controller
+    // without a valid token, spring security blocks the request automatically
+    // this means we never need to check authentication inside individual endpoints
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
